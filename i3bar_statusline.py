@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 """
-Simple Python script implementing the 
+Simple Python script implementing the
 `i3bar-protocol <https://i3wm.org/docs/i3bar-protocol.html>`_.
 """
 import time
@@ -7,25 +8,20 @@ import zoneinfo
 import datetime
 import json
 import abc
-import sys
 import subprocess
+import signal
 
-HEADER = { 
-        "version": 1,
-        "stop_signal": 10,
-        "cont_signal": 12,
-        "click_events": True,
-}
 
 class Block(metaclass=abc.ABCMeta):
+    """Base class for all Statusline blocks"""
 
     def __init__(self, name, update_interval):
         """"
-        ``update_interval`` is the periode in seconds after which the block should
-        update its cache before returning its attributes.
+        ``update_interval`` is the periode in seconds after which the block
+        should update its cache before returning its attributes.
         """
         self.update_interval = update_interval
-        self.last_update = time.time() 
+        self.last_update = time.time()
         self._attr = {
             "full_text": None,
             #"short_text": None,
@@ -50,17 +46,20 @@ class Block(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def update(self):
         """
-        Update the attributes that are returnd by self.getAttributes().
-        Should be implemented by every subclass of Block. 
+        Update the attributes in the dictonary *self._attr*.
+        Should be implemented by every subclass of Block.
         """
 
-    
     def get_attributes(self) -> dict:
+        """
+        Calls the *update* method if needed and returns a dictonary with
+        the attributes of this block.
+        """
         if time.time() - self.last_update >= self.update_interval:
             self.update()
-            self.last_update = time.time() 
+            self.last_update = time.time()
         return self._attr
-    
+
 
 class TimeBlock(Block):
     """Get the current time"""
@@ -102,7 +101,7 @@ class AudioBlock(Block):
                 ['pamixer', '--get-volume'], text=True, capture_output=True
         )
         volume = volume.stdout.strip()
-        if mute: 
+        if mute:
             self._attr['full_text'] = '\U0001F507 ' + volume + '%'
         elif int(volume) < 33.3:
             self._attr['full_text'] = '\U0001F508 ' + volume + '%'
@@ -115,7 +114,7 @@ class AudioBlock(Block):
 class CpuBlock(Block):
     """Get average cpu usage"""
     def update(self):
-        mhz_cpu = [] 
+        mhz_cpu = []
         with open('/proc/cpuinfo') as cpuinfo:
             temp = cpuinfo.read()
             temp = temp.splitlines()
@@ -154,22 +153,48 @@ class RamBlock(Block):
 
 
 class StatusLine:
+    """
+    Used to build the statusline.
+    *__init__* expects Block objects as arguments.
+    """
     def __init__(self, *blocks):
-        for e in blocks:
-            if not isinstance(e, Block):
-                raise ValueError(f'"{e}" is not a subclass of "Block"')
+        for elem in blocks:
+            if not isinstance(elem, Block):
+                raise ValueError(f'"{elem}" is not a subclass of "Block"')
         self.blocks = blocks
 
     def print(self):
         """Print one statusline"""
         statusline = []
-        for e in self.blocks:
-            statusline.append(e.get_attributes())
+        for elem in self.blocks:
+            statusline.append(elem.get_attributes())
         print(json.dumps(statusline) + ",")
+
+def handle_stop_signal(signal_num, frame):
+    """
+    Handle for the *stop_signal* defined in the i3bar-protocol header block.
+    """
+    sig_set = set()
+    sig_set.add(signal.SIGCONT)
+    signal.sigwait(sig_set)
+
+def handle_cont_signal(signal_num, frame):
+    """
+    Handle for the *cont_signal* defined in the i3bar-protocol header block.
+    """
+    pass
 
 
 def main():
     """Main function"""
+    HEADER = {
+            "version": 1,
+            "stop_signal": int(signal.SIGUSR1),
+            "cont_signal": int(signal.SIGCONT),
+            "click_events": True,
+    }
+    signal.signal(signal.SIGUSR1, handle_stop_signal)
+    signal.signal(signal.SIGCONT, handle_cont_signal)
     statusline1 = StatusLine(
             RamBlock('ram', 3),
             CpuBlock('cpu', 3),
@@ -180,12 +205,9 @@ def main():
     )
     print(json.dumps(HEADER))
     print('[')
-    while True: 
+    while True:
         statusline1.print()
         time.sleep(0.1)
 
 if __name__ == '__main__':
     main()
-
-
-
