@@ -83,7 +83,7 @@ class IwdStatusBlock(Block):
                 capture_output=True,
         )
         iwctl_output = iwctl_output.stdout.strip().splitlines()
-        connected_network = "No wlan connection"
+        connected_network = b'No wlan connection'
         for line in iwctl_output:
             if b'network' in line:
                 line_parts = line.strip().split()
