@@ -93,13 +93,18 @@ class IwdStatusBlock(Block):
 class AudioBlock(Block):
     """Get audio with pamixer"""
     def update(self):
+        try:
+            volume = subprocess.run(
+                    ['pamixer', '--get-volume'], text=True, capture_output=True,
+                    check=True
+            )
+        except subprocess.CalledProcessError:
+            self._attr['full_text'] = 'Could not find audio'
+            return
         mute = subprocess.run(
-                ['pamixer', '--get-mute'], text=True, capture_output=True
+                ['pamixer', '--get-mute'], text=True, capture_output=True,
         )
         mute = mute.stdout.strip().upper() == 'TRUE'
-        volume = subprocess.run(
-                ['pamixer', '--get-volume'], text=True, capture_output=True
-        )
         volume = volume.stdout.strip()
         if mute:
             self._attr['full_text'] = '\U0001F507 ' + volume + '%'
@@ -172,7 +177,7 @@ class StatusLine:
 
 def handle_stop_signal(signal_num, frame):
     """
-    Handle for the *stop_signal* defined in the i3bar-protocol header block.
+    Handle the *stop_signal* defined in the i3bar-protocol header block.
     """
     sig_set = set()
     sig_set.add(signal.SIGCONT)
@@ -180,7 +185,7 @@ def handle_stop_signal(signal_num, frame):
 
 def handle_cont_signal(signal_num, frame):
     """
-    Handle for the *cont_signal* defined in the i3bar-protocol header block.
+    Handle the *cont_signal* defined in the i3bar-protocol header block.
     """
     pass
 
