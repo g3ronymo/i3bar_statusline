@@ -157,6 +157,18 @@ class RamBlock(Block):
         self._attr['full_text'] = str(ram_usage) + ' Gb'
 
 
+class XkbLayoutState(Block):
+    """
+    Get name of current keyboard layout.
+    Depends on: `xkblayout-state <https://github.com/nonpop/xkblayout-state>`_
+    """
+    def update(self):
+        output = subprocess.run(['xkblayout-state', 'print', '%n'],
+                text=True, capture_output=True)
+        self._attr['full_text'] = output.stdout.strip()
+
+
+
 class StatusLine:
     """
     Used to build the statusline.
@@ -201,6 +213,7 @@ def main():
     signal.signal(signal.SIGUSR1, handle_stop_signal)
     signal.signal(signal.SIGCONT, handle_cont_signal)
     statusline1 = StatusLine(
+            XkbLayoutState('xkblayout', 1),
             RamBlock('ram', 3),
             CpuBlock('cpu', 3),
             AudioBlock('audio', 1),
