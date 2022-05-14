@@ -76,18 +76,30 @@ class DateBlock(Block):
         self._attr['full_text'] = now.strftime('%d.%m.%Y')
 
 class IwdStatusBlock(Block):
-    """Get status of iwd connection"""
+    """Get wifi status from iwd"""
     def update(self):
         iwctl_output = subprocess.run(
                 ['iwctl', 'station', 'wlan0', 'show'],
-                capture_output=True,
-        )
+                capture_output=True)
         iwctl_output = iwctl_output.stdout.strip().splitlines()
         connected_network = b'No wlan connection'
         for line in iwctl_output:
             if b'network' in line:
                 line_parts = line.strip().split()
                 connected_network = line_parts[2]
+        self._attr['full_text'] = str(connected_network, encoding='utf-8')
+
+class NetworkManagerWIFIBlock(Block):
+    """Get wifi status from NetworkManager""" 
+    def update(self):
+        nmcli_output = subprocess.run(
+                'nmcli -f GENERAL.CONNECTION device show wlan0'.split(),
+                capture_output=True)
+        connected_network = nmcli_output.stdout.split()
+        if len(connected_network) == 0:
+            connected_network = b"No wlan connection"
+        else:
+            connected_network = connected_network[-1]
         self._attr['full_text'] = str(connected_network, encoding='utf-8')
 
 class AudioBlock(Block):
@@ -213,13 +225,7 @@ def main():
     signal.signal(signal.SIGUSR1, handle_stop_signal)
     signal.signal(signal.SIGCONT, handle_cont_signal)
     statusline1 = StatusLine(
-            XkbLayoutState('xkblayout', 1),
-            RamBlock('ram', 3),
-            CpuBlock('cpu', 3),
-            AudioBlock('audio', 1),
-            IwdStatusBlock('iwctl', 10),
-            TimeBlock('time', 1),
-            DateBlock('date', 100),
+            # Blocks go here
     )
     print(json.dumps(HEADER))
     print('[')
